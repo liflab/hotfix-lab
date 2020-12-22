@@ -1,0 +1,65 @@
+/****************************************
+ * OPL 12.10.0.0 Model
+ * Tree size:             2
+ * Tree depth:            2
+****************************************/
+int nb_rectangles=2;
+{int} rectangles_id={0, 1};
+float ini_Height[rectangles_id]=[0.0, 4.0];
+float ini_Width[rectangles_id]=[0.0, 4.0];
+float ini_left[rectangles_id]=[2.0, 0.0];
+float ini_top[rectangles_id]=[2.0, 0.0];
+dvar float Height[rectangles_id];
+dvar float Width[rectangles_id];
+dvar float left[rectangles_id];
+dvar float top[rectangles_id];
+execute
+{
+cplex.tilim=1000;
+cplex.epgap=0.2;
+}
+minimize sum(i in rectangles_id)(abs(top[i]-ini_top[i])+abs(left[i]-ini_left[i]));
+subject to {
+left[1]==ini_left[1];
+top[1]==ini_top[1];
+top[1]<=top[0];top[1]+Height[1]>= top[0]+Height[0];left[1]<=left[0];left[1]+Width[1]>= left[0]+Width[0];
+forall(k in rectangles_id)
+Width[k]>=ini_Width[k]; 
+forall(l in rectangles_id)
+Height[l]>=ini_Height[l]; 
+}
+execute DISPLAY
+{
+write("var Top = [");
+for(var i in rectangles_id)
+{
+if (i!=(nb_rectangles-1))
+write(top[i]+", ");
+else
+write(top[i]+"];\n");
+}
+write("var left = [");
+for(var i in rectangles_id)
+{
+if (i!=(nb_rectangles-1))
+write(left[i]+", ");
+else
+write(left[i]+"];\n");
+}
+write("var height = [");
+for(var i in rectangles_id)
+{
+if (i!=(nb_rectangles-1))
+write(Height[i]+", ");
+else
+write(Height[i]+"];\n");
+}
+write("var width = [");
+for(var i in rectangles_id)
+{
+if (i!=(nb_rectangles-1))
+write(Width[i]+", ");
+else
+write(Width[i]+"];\n");
+}
+}
