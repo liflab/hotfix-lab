@@ -53,32 +53,63 @@ public class SolverExperiment extends Experiment
 	 * Name of parameter "time"
 	 */
 	public static final transient String TIME = "Duration";
-	
+
 	/**
 	 * Name of parameter "tree depth"
 	 */
 	public static final transient String DEPTH = "Tree depth";
-	
+
 	/**
 	 * Name of parameter "width"
 	 */
 	public static final transient String WIDTH = "Tree width";
 	
 	/**
+	 * Name of parameter "tree initial size"
+	 */
+	public static final transient String INITIAL_SIZE = "Initial size";
+
+	/**
 	 * Name of parameter "tree size"
 	 */
 	public static final transient String SIZE = "Tree size";
-	
+
 	/**
 	 * Name of parameter "number of constraints"
 	 */
 	public static final transient String NUM_CONSTRAINTS = "Constraints";
-	
+
 	/**
 	 * Name of parameter "number of faults"
 	 */
 	public static final transient String NUM_FAULTS = "Faults";
+
+	/**
+	 * Name of parameter "tree type"
+	 */
+	public static final transient String TREE_TYPE = "Tree type";
+
+	/**
+	 * Name of parameter value "complete"
+	 */
+	public static final transient String TREE_TYPE_COMPLETE = "Complete";
+
+	/**
+	 * Name of parameter value "trimmed"
+	 */
+	public static final transient String TREE_TYPE_TRIMMED = "Trimmed";
 	
+	/**
+	 * Name of parameter "tree hash"
+	 */
+	public static final transient String TREE_HASH = "Tree hash";
+	
+	/**
+	 * A global flag to disable the solver on all experiments. Used only
+	 * for debugging the lab.
+	 */
+	public static transient boolean SOLVE = true;
+
 	/**
 	 * A provider to obtain a box model
 	 */
@@ -93,9 +124,12 @@ public class SolverExperiment extends Experiment
 		describe(TIME, "The time taken to solve the constraints, in milliseconds");
 		describe(DEPTH, "The maximum depth of the DOM tree");
 		//describe(WIDTH, "The maximum degree of a node in the DOM tree");
-		describe(SIZE, "The number of nodes in the DOM tree");
+		describe(INITIAL_SIZE, "The number of nodes in the original DOM tree (before any reduction)");
+		describe(SIZE, "The number of nodes in the DOM tree (possibly after reduction)");
 		describe(NUM_FAULTS, "The number of faults present in the page");
 		describe(NUM_CONSTRAINTS, "The number of alignment constraints applied to the elements of the page");
+		describe(TREE_TYPE, "Whether the input page is trimmed to only its zone of influence");
+		describe(TREE_HASH, "A hash value used to distinguish the various DOM trees");
 		m_boxProvider = provider;
 	}
 
@@ -106,7 +140,19 @@ public class SolverExperiment extends Experiment
 		{
 			// Get page
 			Box page = m_boxProvider.getBox();
+			setInput(INITIAL_SIZE, page.getSize());
+			setInput(TREE_HASH, page.hashCode());
+			if (readString(TREE_TYPE).compareTo(TREE_TYPE_TRIMMED) == 0)
+			{
+				page = trim(page);
+			}
 			writeStats(page);
+			
+			// If solving is disabled, we are done
+			if (!SOLVE)
+			{
+				return;
+			}
 
 			// Open output streams 
 			FileOutputStream oplFileStream = new FileOutputStream("oplWebSite.txt");
@@ -117,7 +163,7 @@ public class SolverExperiment extends Experiment
 			constraints.addAll(Contained.addContainmentConstraints(page));
 			constraints.addAll(Disjoint.addContainmentConstraints(page));
 			setInput(NUM_CONSTRAINTS, constraints.size());
-			
+
 			// Start stopwatch
 			long start_time = System.currentTimeMillis();
 
@@ -151,11 +197,11 @@ public class SolverExperiment extends Experiment
 			//opl.printConflict(System.out);
 			boolean result = opl.getCplex().solve();
 			System.out.println(opl.getCplex().getStatus());
-			
+
 			// Stop stopwatch
 			long end_time = System.currentTimeMillis();
 			write(TIME, end_time - start_time);
-					
+
 			if (result)
 			{
 				/* System.out.println();
@@ -179,11 +225,68 @@ public class SolverExperiment extends Experiment
 			throw new ExperimentException(e);
 		}
 	}
-	
+
 	protected void writeStats(Box b)
 	{
 		setInput(DEPTH, b.getDepth());
 		setInput(SIZE, b.getSize());
 		setInput(NUM_FAULTS, m_boxProvider.getMisalignmentCount() + m_boxProvider.getOverflowCount() + m_boxProvider.getOverlapCount());
+	}
+
+	protected static Box trim(Box b)
+	{
+		Set<Integer> to_include = new HashSet<Integer>();
+		visit(b, to_include);
+		return copy(b, to_include);
+	}
+
+	protected static void visit(Box current, Set<Integer> to_include)
+	{
+		if (current.isAltered())
+		{
+			propagate(current, to_include);
+		}
+		for (Box child : current.getChildren())
+		{
+			visit(child, to_include);
+		}
+	}
+
+	protected static void propagate(Box current, Set<Integer> to_include)
+	{
+		Box parent = current.getParent();
+		if (parent == null)
+		{
+			to_include.add(current.getId());
+			return;
+		}
+		for (Box sibling : parent.getChildren())
+		{
+			to_include.add(sibling.getId());
+		}
+		propagate(parent, to_include);
+	}
+
+	protected static Box copy(Box current, Set<Integer> to_include) 
+	{
+		if (!to_include.contains(current.getId()))
+		{
+			return null;
+		}
+		Box current_copy = new Box(current.getX(), current.getY(), current.getWidth(), current.getHeight());
+		current_copy.setPadding(current.getPadding());
+		if (current.isAltered())
+		{
+			current_copy.alter();
+		}
+		for (Box child : current.getChildren())
+		{
+			Box child_copy = copy(child, to_include);
+			if (child_copy != null)
+			{
+				current_copy.addChild(child_copy);
+			}
+		}
+		return current_copy;
 	}
 }
