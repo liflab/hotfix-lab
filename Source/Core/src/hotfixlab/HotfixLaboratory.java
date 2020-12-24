@@ -50,7 +50,7 @@ public class HotfixLaboratory extends Laboratory
 		int seed = 1; //getRandomSeed();
 		
 		// Maximum number of faults in a page
-		int max_faults = 3;
+		int max_faults = 1;
 		
 		// Parse CLI arguments
 		ArgumentMap arguments = getCliArguments();
