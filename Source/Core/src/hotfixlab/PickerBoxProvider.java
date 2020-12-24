@@ -47,6 +47,11 @@ public class PickerBoxProvider implements BoxProvider
 	 */
 	protected Box m_box;
 	
+	/**
+	 * The maximum number of faults that can be injected in a page
+	 */
+	protected int m_maxFaults = -1;
+	
 	protected transient HorizontalFlowLayout m_horizontalFlowLayout1;
 	
 	protected transient HorizontalFlowLayout m_horizontalFlowLayout2;
@@ -56,16 +61,21 @@ public class PickerBoxProvider implements BoxProvider
 	/**
 	 * Creates a new instance of picker box provider.
 	 * @param picker The picker used to provide a box
+	 * @param max_faults The maximum number of faults that can be injected
+	 * in a page. If set to a negative value, no limit is applied on the
+	 * number of injected faults.
 	 */
-	public PickerBoxProvider(int seed)
+	public PickerBoxProvider(int seed, int max_faults)
 	{
 		super();
+		m_maxFaults = max_faults;
 		int min_depth = 2; // 4
-		int max_depth = 5; // 5
+		int max_depth = 10; // 5
 		float p_degree = 2.2f; //2.2f;
 		float p_misalignment = 0.025f, p_overlap = 0.025f, p_overflow = 0.025f;
 
 		// Initialize RNGs and seed
+		RandomBooleanMax rmb = new RandomBooleanMax(m_maxFaults);
 		RandomInteger depth = new RandomInteger(min_depth, max_depth); // 6-22
 		PoissonInteger degree = new PoissonInteger(p_degree);
 		RandomIntervalFloat width = new RandomIntervalFloat(5, 20);
@@ -73,11 +83,11 @@ public class PickerBoxProvider implements BoxProvider
 		RandomFloat float_source = new RandomFloat();
 		RandomInteger row_size = new RandomInteger(0, 10);
 		RandomInteger column_size = new RandomInteger(0, 10);
-		RandomBoolean misalignment = new RandomBoolean(p_misalignment);
+		RandomBoolean misalignment = rmb.getRandomBoolean(new RandomBoolean(p_misalignment));
 		RandomInteger misalignment_shift = new RandomInteger(2, 10);
-		RandomBoolean overlap = new RandomBoolean(p_overlap);
+		RandomBoolean overlap = rmb.getRandomBoolean(new RandomBoolean(p_overlap));
 		RandomInteger overlap_shift = new RandomInteger(2, 10);
-		RandomBoolean overflow = new RandomBoolean(p_overflow);
+		RandomBoolean overflow = rmb.getRandomBoolean(new RandomBoolean(p_overflow));;
 		RandomInteger overflow_shift = new RandomInteger(2, 10);
 		ElementPicker<LayoutManager> layout = new ElementPicker<LayoutManager>(float_source);
 		if (seed >= 0)

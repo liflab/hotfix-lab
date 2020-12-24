@@ -149,7 +149,7 @@ public class SolverExperiment extends Experiment
 			writeStats(page);
 			
 			// If solving is disabled, we are done
-			if (!SOLVE)
+			if (!SOLVE || readString(TREE_TYPE).compareTo(TREE_TYPE_TRIMMED) != 0)
 			{
 				return;
 			}
@@ -273,7 +273,7 @@ public class SolverExperiment extends Experiment
 		{
 			return null;
 		}
-		Box current_copy = new Box(current.getX(), current.getY(), current.getWidth(), current.getHeight());
+		Box current_copy = new IdedBox(current.getId(), current.getX(), current.getY(), current.getWidth(), current.getHeight());
 		current_copy.setPadding(current.getPadding());
 		if (current.isAltered())
 		{

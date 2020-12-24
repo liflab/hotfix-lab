@@ -41,13 +41,16 @@ public class HotfixLaboratory extends Laboratory
 	/**
 	 * Number of pages to generate
 	 */
-	protected int m_numPages = 50;
+	protected int m_numPages = 10;
 	
 	@Override
 	public void setup()
 	{
 		// Get random seed from lab
 		int seed = 1; //getRandomSeed();
+		
+		// Maximum number of faults in a page
+		int max_faults = 3;
 		
 		// Parse CLI arguments
 		ArgumentMap arguments = getCliArguments();
@@ -96,7 +99,7 @@ public class HotfixLaboratory extends Laboratory
 		add(p_trim_effect);
 		for (int i = 0; i < m_numPages; i++)
 		{
-			PickerBoxProvider pbp = new PickerBoxProvider(seed + i);
+			PickerBoxProvider pbp = new PickerBoxProvider(seed + i, max_faults);
 			SolverExperiment e_complete = new SolverExperiment(pbp);
 			e_complete.setInput(TREE_TYPE, TREE_TYPE_COMPLETE);
 			add(e_complete);
