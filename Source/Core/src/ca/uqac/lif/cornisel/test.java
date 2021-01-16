@@ -30,6 +30,7 @@ import ca.uqac.lif.pagen.Box;
 import ca.uqac.lif.pagen.LayoutConstraint;
 import ca.uqac.lif.pagen.LayoutConstraint.Contained;
 import ca.uqac.lif.pagen.LayoutConstraint.Disjoint;
+import ca.uqac.lif.pagen.LayoutConstraint.HorizontallyAligned;
 import ca.uqac.lif.pagen.OplRenderer;
 
 import ilog.concert.*;
@@ -40,6 +41,9 @@ public class test {
 	static PrintStream print;
 	static IdedBox boxedWebSite;
 	static ArrayList<Double> top, left, width, height;
+	static IdedBox child;
+	static IdedBox child2;
+	static IdedBox parent;
 
 	public static void main(String[] args) throws InterruptedException {
 		//Declare variables
@@ -65,18 +69,28 @@ public class test {
 
 			//Open web page
 			//corniSelDriver.setCornipickleProperties(propertyString);
-			corniSelDriver.get("https://www.google.ca");
+			//corniSelDriver.get("https://www.google.ca");
+			//corniSelDriver.get("C:\\Users\\xavierchamberland\\Downloads\\Google_contained_error_connexion.html");
+			//corniSelDriver.get("C:\\Users\\xavierchamberland\\Downloads\\Moodle-overlap\\1399132246769_132\\index.html");
+			corniSelDriver.get("file:///home/sylvain/Desktop/1399132246769_132/index.html");
 
 			//Recover all the DOM tree of the web page
 			JavascriptExecutor js = (JavascriptExecutor)  chromeDriver;			
 			String n = js.executeScript(Scripts.nodifyScript).toString();
-			WebNode w = new WebNode(n);
-			IdedBox boxedWebSite = generateBoxedWebSite(w);
+			//WebNode w = new WebNode(n);
+			IdedBox boxedWebSite = generateBoxedWebSite(WebNode.buildFromJSON(n));
 
 			//Declare constraints for CPLEX
 			Set<LayoutConstraint> constraints = new HashSet<LayoutConstraint>();
-			constraints.addAll(Contained.addContainmentConstraints(boxedWebSite));
-			constraints.addAll(Disjoint.addContainmentConstraints(boxedWebSite));
+			//constraints.add(new Contained(child,parent));
+			constraints.add(new Disjoint(child2, child));
+			//constraints.addAll(Contained.addContainmentConstraints(boxedWebSite));
+			//constraints.addAll(Disjoint.addContainmentConstraints(boxedWebSite));
+			//constraints.addAll(HorizontallyAligned);
+			//constraints.addAll(VerticallyAligned);
+			PrintStream debug_ps = new PrintStream(new FileOutputStream(new File("/tmp/before.txt")));
+			printNodeProperties(debug_ps, boxedWebSite);
+			debug_ps.close();
 
 			//Generate OPL for CPLEX
 			OplRenderer oplRenderer = new OplRenderer();
@@ -117,21 +131,16 @@ public class test {
 			opl.generate();
 			//opl.printConflict(System.out);
 			boolean result = opl.getCplex().solve();
-			System.out.println(opl.getCplex().getStatus());
 			if (result) {
-				/* System.out.println();
-				 System.out.println();
-				 System.out.println("OBJECTIVE: "
-						 + opl.getCplex().getObjValue());*/
+				
 				//opl.postProcess();
 				ByteArrayOutputStream stream = new ByteArrayOutputStream(); //CPlexSolution.txt
-				//opl.printSolution(System.out);
+			
 				opl.printSolution(stream);
 				String solution = new String(stream.toByteArray());
-				//String finalString = new String(stream.toByteArray());
-				// print.println(finalString);
+				
 				readCPLEXSolution(solution);
-				//correctWebPage(js);
+				correctWebPage(js);
 			} 
 
 			/**utiliser querySelectorAll pour aller chercher l'�l�ment � modifier
@@ -160,10 +169,24 @@ public class test {
 	private static IdedBox generateBoxedWebSite(WebNode root)
 	{
 		IdedBox rootBox = new IdedBox(root.getId(), root.getX(), root.getY(), root.getW(), root.getH());
-
+		if(rootBox.getId() == 0)
+			child = rootBox;
+		if(rootBox.getId() == 9)
+			parent = rootBox;
+		if(rootBox.getId() == 8)
+			child2 = rootBox;
 		root.getChildren().forEach((n)->rootBox.addChild(generateBoxedWebSite(n)));
 
 		return rootBox;
+	}
+	
+	protected static void printNodeProperties(PrintStream ps, Box b)
+	{
+		ps.println("ID: " + b.getId() + ", " + b.getWidth() + "x" + b.getHeight() + " at (" + b.getX() + "," + b.getY() + ")");
+		for (Box c : b.getChildren())
+		{
+			printNodeProperties(ps, c);
+		}
 	}
 
 	private static void readCPLEXSolution(String s_content)
@@ -189,7 +212,7 @@ public class test {
 		}
 	}
 
-	private static void correctWebPage(JavascriptExecutor js)
+	private static void correctWebPage(JavascriptExecutor js) throws IOException
 	{
 		//Check if there are any corrections and if there was no error during corrections generation
 		if((top.size() == left.size()) && 
@@ -197,18 +220,26 @@ public class test {
 				(width.size() == height.size()) &&
 				!top.isEmpty())
 		{
+			PrintStream debug_ps = new PrintStream(new FileOutputStream(new File("/tmp/after.txt")));
 			//Apply corrections for every element of the web page
 			for(int i = 0; i < top.size(); i++)
 			{
+				debug_ps.println("ID: " + i + ", " + width.get(i) + "x" + height.get(i) + " at (" + left.get(i) + "," + top.get(i) + ")");
+				/*if (i != 0)
+				{
+					continue;
+				}*/
 				String correctionString = Scripts.correctionScript(i, top.get(i), left.get(i), width.get(i), height.get(i));
-				/*System.out.println(correctionString);
- 				System.out.println(i);
+				
+				//System.out.println(correctionString);
+ 				/*System.out.println(i);
  				System.out.println(top);
  				System.out.println(left);
  				System.out.println(width);
  				System.out.println(height);*/
 				js.executeScript(correctionString);
 			}
+			debug_ps.close();
 		}
 	}
 }
@@ -218,31 +249,42 @@ class WebNode{
 	private ArrayList<WebNode> children;
 	private float x, y, w, h;
 
-	public WebNode(String s)
+	public WebNode()
 	{
 		children = new ArrayList<WebNode>();
 		x = y = w = h = 0;
-
+		id = 0;
+		
+	}
+	
+	public static WebNode buildFromJSON(String s)
+	{
+		WebNode n = new WebNode();
 		try 
 		{
+		
 			JSONParser parser = new JSONParser();
 			JSONObject obj = (JSONObject) parser.parse(s);
-			id = Integer.valueOf(obj.get("nodeName").toString());
-			x = Float.valueOf(obj.get("x").toString());
-			y = Float.valueOf(obj.get("y").toString());
-			w = Float.valueOf(obj.get("width").toString());
-			h = Float.valueOf(obj.get("height").toString());
+			n.id = Integer.valueOf(obj.get("nodeName").toString());
+			n.x = Float.valueOf(obj.get("x").toString());
+			n.y = Float.valueOf(obj.get("y").toString());
+			n.w = Float.valueOf(obj.get("width").toString());
+			n.h = Float.valueOf(obj.get("height").toString());
 			JSONArray a = (JSONArray) obj.get("children");
 			for(Object o: a){
 				if ( o instanceof JSONObject ) {
-					children.add(new WebNode(((JSONObject) o).toJSONString()));
+					
+					n.children.add(buildFromJSON(((JSONObject) o).toJSONString()));
 				}
 			}
 		}
 		catch(Exception e)
 		{
 			e.printStackTrace();
+			System.out.println(n.id);
+			System.out.println(s);
 		}
+		return n;
 	}
 
 	public int getId() {
@@ -283,6 +325,8 @@ class IdedBox extends Box
 		m_children.add(r);
 	}
 }
+
+
 
 //Listener test for cornipickle statements
 class Listener implements EvaluationListener
