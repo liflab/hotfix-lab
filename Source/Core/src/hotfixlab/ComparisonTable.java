@@ -102,6 +102,12 @@ public class ComparisonTable extends Table
 		// Ignore ordering
 		return getDataTable(temporary);
 	}
+	
+	@Override
+	public ComparisonTable duplicate(boolean with_state)
+	{
+		return null; // No need to implement
+	}
 
 	@Override
 	public TempTable getDataTable(boolean temporary)

@@ -61,7 +61,18 @@
       <classname>ca.uqac.lif.labpal.Laboratory</classname>
       <bundle>true</bundle>
       <files>
-        <zip>https://github.com/liflab/labpal/releases/download/v2.11.6/labpal-2.11.6zip</zip>
+        <zip>https://github.com/liflab/labpal/releases/download/v2.11.9a/labpal-2.11.9a.zip</zip>
+      </files>
+    </dependency>
+    <dependency>
+      <!--
+      LabPal. Used to handle the lab
+      -->
+      <name>PageGen</name>
+      <classname>ca.uqac.lif.pagen.Box</classname>
+      <bundle>true</bundle>
+      <files>
+        <zip>https://github.com/liflab/pagen/releases/download/v1.3/pagen-1.3.zip</zip>
       </files>
     </dependency>
   </dependencies>

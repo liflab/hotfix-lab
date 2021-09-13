@@ -31,7 +31,7 @@ import ca.uqac.lif.pagen.LayoutConstraint;
 import ca.uqac.lif.pagen.LayoutConstraint.Contained;
 import ca.uqac.lif.pagen.LayoutConstraint.Disjoint;
 import ca.uqac.lif.pagen.LayoutConstraint.HorizontallyAligned;
-import ca.uqac.lif.pagen.OplRenderer;
+import ca.uqac.lif.pagen.opl.OplAbsoluteRenderer;
 
 import ilog.concert.*;
 import ilog.opl.*;
@@ -93,7 +93,7 @@ public class test {
 			debug_ps.close();
 
 			//Generate OPL for CPLEX
-			OplRenderer oplRenderer = new OplRenderer();
+			OplAbsoluteRenderer oplRenderer = new OplAbsoluteRenderer();
 			oplRenderer.addConstraints(constraints);
 			oplRenderer.render(ps, boxedWebSite);
 			ps.close();

@@ -18,7 +18,6 @@
  */
 package hotfixlab;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -29,11 +28,15 @@ import java.util.Set;
 import ca.uqac.lif.labpal.Experiment;
 import ca.uqac.lif.labpal.ExperimentException;
 import ca.uqac.lif.pagen.Box;
+import ca.uqac.lif.pagen.BoxDependencyGraph;
 import ca.uqac.lif.pagen.LayoutConstraint;
-import ca.uqac.lif.pagen.OplRenderer;
+import ca.uqac.lif.pagen.opl.OplAbsoluteRenderer;
+import ca.uqac.lif.pagen.opl.OplRelativeRenderer;
+import ca.uqac.lif.pagen.opl.OplRenderer;
 import ca.uqac.lif.pagen.LayoutConstraint.Contained;
 import ca.uqac.lif.pagen.LayoutConstraint.Disjoint;
 import ilog.concert.IloException;
+import ilog.opl.IloCplex;
 import ilog.opl.IloOplCompiler;
 import ilog.opl.IloOplErrorHandler;
 import ilog.opl.IloOplFactory;
@@ -45,7 +48,7 @@ import ilog.opl.IloOplSettings;
 /**
  * Experiment that generates an OPL input file from a web page,
  * sends it to CPLEX and retrieves the result.
- * @author Xavier Chamberland-Thibeault, Sylvain Hallé
+ * @author Xavier Chamberland-Thibeault, Stéphane Jacquet, Sylvain Hallé
  */
 public class SolverExperiment extends Experiment
 {
@@ -63,7 +66,7 @@ public class SolverExperiment extends Experiment
 	 * Name of parameter "width"
 	 */
 	public static final transient String WIDTH = "Tree width";
-	
+
 	/**
 	 * Name of parameter "tree initial size"
 	 */
@@ -75,9 +78,19 @@ public class SolverExperiment extends Experiment
 	public static final transient String SIZE = "Tree size";
 
 	/**
+	 * Name of parameter "number of variables"
+	 */
+	public static final transient String NUM_VARIABLES = "Variables";
+
+	/**
 	 * Name of parameter "number of constraints"
 	 */
 	public static final transient String NUM_CONSTRAINTS = "Constraints";
+
+	/**
+	 * Name of parameter "number of model constraints"
+	 */
+	public static final transient String NUM_MODEL_CONSTRAINTS = "Model constraints";
 
 	/**
 	 * Name of parameter "number of faults"
@@ -98,17 +111,21 @@ public class SolverExperiment extends Experiment
 	 * Name of parameter value "trimmed"
 	 */
 	public static final transient String TREE_TYPE_TRIMMED = "Trimmed";
-	
+
+	/**
+	 * Name of parameter value "dependency"
+	 */
+	public static final transient String TREE_TYPE_DEPENDENCY = "Dependency";
+
 	/**
 	 * Name of parameter "tree hash"
 	 */
 	public static final transient String TREE_HASH = "Tree hash";
-	
+
 	/**
-	 * A global flag to disable the solver on all experiments. Used only
-	 * for debugging the lab.
+	 * A flag to disable the solver on this experiment.
 	 */
-	public static transient boolean SOLVE = true;
+	protected transient boolean m_solve = true;
 
 	/**
 	 * A provider to obtain a box model
@@ -116,21 +133,40 @@ public class SolverExperiment extends Experiment
 	protected transient BoxProvider m_boxProvider;
 
 	/**
-	 * Creates a new instance of experiment.
+	 * The maximum time limit, in seconds, given to the external solver
 	 */
-	public SolverExperiment(BoxProvider provider)
+	public static transient int TIMEOUT = 2;
+
+	/**
+	 * Creates a new instance of experiment.
+	 * @param provider An object that can provide a DOM tree to analyze
+	 * @param solve Set to <tt>false</tt> to disable the call to the external
+	 * solver 
+	 */
+	public SolverExperiment(BoxProvider provider, boolean solve)
 	{
-		super();
+		this();
 		describe(TIME, "The time taken to solve the constraints, in milliseconds");
 		describe(DEPTH, "The maximum depth of the DOM tree");
-		//describe(WIDTH, "The maximum degree of a node in the DOM tree");
+		describe(WIDTH, "The maximum degree of a node in the DOM tree");
 		describe(INITIAL_SIZE, "The number of nodes in the original DOM tree (before any reduction)");
 		describe(SIZE, "The number of nodes in the DOM tree (possibly after reduction)");
 		describe(NUM_FAULTS, "The number of faults present in the page");
-		describe(NUM_CONSTRAINTS, "The number of alignment constraints applied to the elements of the page");
+		describe(NUM_CONSTRAINTS, "The number of layout constraints applied to the elements of the page");
+		describe(NUM_MODEL_CONSTRAINTS, "The number of constraints actually present in the numerical model");
+		describe(NUM_VARIABLES, "The number of variables present in the numerical model");
 		describe(TREE_TYPE, "Whether the input page is trimmed to only its zone of influence");
 		describe(TREE_HASH, "A hash value used to distinguish the various DOM trees");
 		m_boxProvider = provider;
+		m_solve = solve;
+	}
+	
+	/**
+	 * No-args constructor to enable serialization.
+	 */
+	protected SolverExperiment()
+	{
+		super();
 	}
 
 	@Override
@@ -144,15 +180,9 @@ public class SolverExperiment extends Experiment
 			setInput(TREE_HASH, page.hashCode());
 			if (readString(TREE_TYPE).compareTo(TREE_TYPE_TRIMMED) == 0)
 			{
-				page = trim(page);
+				page = Box.trim(page);
 			}
 			writeStats(page);
-			
-			// If solving is disabled, we are done
-			if (!SOLVE || readString(TREE_TYPE).compareTo(TREE_TYPE_TRIMMED) != 0)
-			{
-				return;
-			}
 
 			// Open output streams 
 			FileOutputStream oplFileStream = new FileOutputStream("oplWebSite.txt");
@@ -168,11 +198,30 @@ public class SolverExperiment extends Experiment
 			long start_time = System.currentTimeMillis();
 
 			// Generate OPL for CPLEX
-			OplRenderer oplRenderer = new OplRenderer();
-			oplRenderer.addConstraints(constraints);
+			OplRenderer oplRenderer = null;
+			if (readString(TREE_TYPE).compareTo(TREE_TYPE_DEPENDENCY) == 0)
+			{
+				oplRenderer = new OplRelativeRenderer(constraints);
+				BoxDependencyGraph g = new BoxDependencyGraph();
+				g.add(m_boxProvider.getDependencies());
+				((OplRelativeRenderer) oplRenderer).setDependencyGraph(g);
+			}
+			else
+			{
+				oplRenderer = new OplAbsoluteRenderer(constraints);
+			}
 			oplRenderer.render(ps, page);
 			ps.close();
 			oplFileStream.close();
+
+			write(NUM_VARIABLES, oplRenderer.getVariableCount());
+			write(NUM_MODEL_CONSTRAINTS, oplRenderer.getConstraintCount());
+
+			// If solving is disabled, we are done
+			if (!m_solve || readString(TREE_TYPE).compareTo(TREE_TYPE_TRIMMED) != 0)
+			{
+				return;
+			}
 
 			//Generate corrections
 			IloOplFactory.setDebugMode(false);
@@ -194,9 +243,11 @@ public class SolverExperiment extends Experiment
 			settings.setWithLocations(true);
 			settings.setWithNames(true);
 			opl.generate();
+			IloCplex cplex = opl.getCplex();
+			cplex.setParam(IloCplex.Param.TimeLimit, 5);
 			//opl.printConflict(System.out);
-			boolean result = opl.getCplex().solve();
-			System.out.println(opl.getCplex().getStatus());
+			boolean result = cplex.solve();
+			//System.out.println(cplex.getStatus());
 
 			// Stop stopwatch
 			long end_time = System.currentTimeMillis();
@@ -209,9 +260,9 @@ public class SolverExperiment extends Experiment
 				 System.out.println("OBJECTIVE: "
 						 + opl.getCplex().getObjValue());*/
 				//opl.postProcess();
-				ByteArrayOutputStream stream = new ByteArrayOutputStream(); //CPlexSolution.txt
+				//ByteArrayOutputStream stream = new ByteArrayOutputStream(); //CPlexSolution.txt
 				//opl.printSolution(System.out);
-				opl.printSolution(stream);
+				//opl.printSolution(stream);
 				//String solution = new String(stream.toByteArray());
 				//readCPLEXSolution(solution);
 			} 
@@ -229,64 +280,8 @@ public class SolverExperiment extends Experiment
 	protected void writeStats(Box b)
 	{
 		setInput(DEPTH, b.getDepth());
+		setInput(WIDTH, b.getWidth());
 		setInput(SIZE, b.getSize());
 		setInput(NUM_FAULTS, m_boxProvider.getMisalignmentCount() + m_boxProvider.getOverflowCount() + m_boxProvider.getOverlapCount());
-	}
-
-	protected static Box trim(Box b)
-	{
-		Set<Integer> to_include = new HashSet<Integer>();
-		visit(b, to_include);
-		return copy(b, to_include);
-	}
-
-	protected static void visit(Box current, Set<Integer> to_include)
-	{
-		if (current.isAltered())
-		{
-			propagate(current, to_include);
-		}
-		for (Box child : current.getChildren())
-		{
-			visit(child, to_include);
-		}
-	}
-
-	protected static void propagate(Box current, Set<Integer> to_include)
-	{
-		Box parent = current.getParent();
-		if (parent == null)
-		{
-			to_include.add(current.getId());
-			return;
-		}
-		for (Box sibling : parent.getChildren())
-		{
-			to_include.add(sibling.getId());
-		}
-		propagate(parent, to_include);
-	}
-
-	protected static Box copy(Box current, Set<Integer> to_include) 
-	{
-		if (!to_include.contains(current.getId()))
-		{
-			return null;
-		}
-		Box current_copy = new IdedBox(current.getId(), current.getX(), current.getY(), current.getWidth(), current.getHeight());
-		current_copy.setPadding(current.getPadding());
-		if (current.isAltered())
-		{
-			current_copy.alter();
-		}
-		for (Box child : current.getChildren())
-		{
-			Box child_copy = copy(child, to_include);
-			if (child_copy != null)
-			{
-				current_copy.addChild(child_copy);
-			}
-		}
-		return current_copy;
 	}
 }

@@ -48,6 +48,7 @@ public class LabStats extends MacroMap
 		add("numdatapoints", "The number of data points in the lab");
 		add("numpages", "The number of pages used in our experiments");
 		add("maxsize", "The maximum size of pages");
+		add("solvertimeout", "The time limit (in s) given to the solver");
 	}
 
 	@Override
@@ -59,6 +60,7 @@ public class LabStats extends MacroMap
 		map.put("numdatapoints", new JsonNumber(m_lab.countDataPoints()));
 		map.put("numpages", new JsonNumber(((HotfixLaboratory) m_lab).getNumberOfPages()));
 		map.put("maxsize", new JsonNumber(((HotfixLaboratory) m_lab).getMaxSize()));
+		map.put("solvertimeout", new JsonNumber(SolverExperiment.TIMEOUT));
 	}
 
 	protected String getMemory()

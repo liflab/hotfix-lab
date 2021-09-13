@@ -18,7 +18,10 @@
  */
 package hotfixlab;
 
+import java.util.Set;
+
 import ca.uqac.lif.pagen.Box;
+import ca.uqac.lif.pagen.BoxDependency;
 
 /**
  * Provides a {@link Box} object.
@@ -36,4 +39,6 @@ public interface BoxProvider
 	public int getOverlapCount();
 	
 	public int getOverflowCount();
+	
+	public Set<BoxDependency> getDependencies();
 }

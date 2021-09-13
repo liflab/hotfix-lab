@@ -30,10 +30,12 @@ import ca.uqac.lif.mtnp.plot.gnuplot.Scatterplot;
 import static hotfixlab.SolverExperiment.INITIAL_SIZE;
 import static hotfixlab.SolverExperiment.NUM_CONSTRAINTS;
 import static hotfixlab.SolverExperiment.NUM_FAULTS;
+import static hotfixlab.SolverExperiment.NUM_VARIABLES;
 import static hotfixlab.SolverExperiment.SIZE;
 import static hotfixlab.SolverExperiment.TIME;
 import static hotfixlab.SolverExperiment.TREE_TYPE;
 import static hotfixlab.SolverExperiment.TREE_TYPE_COMPLETE;
+import static hotfixlab.SolverExperiment.TREE_TYPE_DEPENDENCY;
 import static hotfixlab.SolverExperiment.TREE_TYPE_TRIMMED;
 
 public class HotfixLaboratory extends Laboratory
@@ -41,7 +43,7 @@ public class HotfixLaboratory extends Laboratory
 	/**
 	 * Number of pages to generate
 	 */
-	protected int m_numPages = 10;
+	protected int m_numPages = 100;
 	
 	@Override
 	public void setup()
@@ -52,12 +54,26 @@ public class HotfixLaboratory extends Laboratory
 		// Maximum number of faults in a page
 		int max_faults = 1;
 		
+		// Whether to send the experiments to the external solver
+		boolean solve_complete = true, solve_reduced = true;
+		
 		// Parse CLI arguments
 		ArgumentMap arguments = getCliArguments();
 		if (arguments.hasOption("no-solve"))
 		{
-			SolverExperiment.SOLVE = false;
-			System.out.println("Solver disabled by command-line parameter");
+			solve_complete = false;
+			solve_reduced = false;
+			System.out.println("Solver disabled for all trees by command-line parameter");
+		}
+		if (arguments.hasOption("no-complete"))
+		{
+			solve_complete = false;
+			System.out.println("Solver disabled for complete trees by command-line parameter");
+		}
+		if (arguments.hasOption("max-faults"))
+		{
+			max_faults = Integer.parseInt(arguments.getOptionValue("max-faults").trim());
+			System.out.println("Number of faults limited to " + max_faults);
 		}
 
 		ExperimentTable et_time = new ExperimentTable(INITIAL_SIZE, TIME);
@@ -66,6 +82,8 @@ public class HotfixLaboratory extends Laboratory
 		add(et_time);
 		Scatterplot p_time = new Scatterplot(et_time);
 		p_time.setCaption(Axis.X, "Size").setCaption(Axis.Y, "Time (ms)");
+		p_time.setLogscale(Axis.X);
+		p_time.withLines(false);
 		p_time.setTitle(et_time.getTitle());
 		p_time.setNickname("pTimeVsSize");
 		add(p_time);
@@ -87,26 +105,54 @@ public class HotfixLaboratory extends Laboratory
 		p_constraints.setTitle(et_constraints.getTitle());
 		p_constraints.setNickname("pTimeVsConstraints");
 		add(p_constraints);
-		ComparisonTable t_trim_effect = new ComparisonTable(SIZE);
-		t_trim_effect.setTitle("Impact of zone of influence on tree size");
+		ComparisonTable t_trim_effect = new ComparisonTable(NUM_VARIABLES);
+		t_trim_effect.setTitle("Impact of zone of influence on number of variables");
 		t_trim_effect.setNickname("tZoneInfluenceSize");
 		add(t_trim_effect);
 		Scatterplot p_trim_effect = new Scatterplot(t_trim_effect);
 		p_trim_effect.setCaption(Axis.X, "Full tree").setCaption(Axis.Y, "Zone of influence");
+		p_trim_effect.setLogscale(Axis.X).setLogscale(Axis.Y);
 		p_trim_effect.setTitle(t_trim_effect.getTitle());
 		p_trim_effect.setNickname("pZoneInfluenceSize");
 		p_trim_effect.withLines(false);
 		add(p_trim_effect);
+		ComparisonTable t_graph_effect_var = new ComparisonTable(NUM_VARIABLES);
+		t_graph_effect_var.setTitle("Impact of dependency graph on number of variables");
+		t_graph_effect_var.setNickname("tDepGraphSize");
+		add(t_graph_effect_var);
+		Scatterplot p_graph_effect_var = new Scatterplot(t_graph_effect_var);
+		p_graph_effect_var.setCaption(Axis.X, "Full tree").setCaption(Axis.Y, "Dependency graph");
+		p_graph_effect_var.setLogscale(Axis.X).setLogscale(Axis.Y);
+		p_graph_effect_var.setTitle(t_graph_effect_var.getTitle());
+		p_graph_effect_var.setNickname("pDepGraphSize");
+		p_graph_effect_var.withLines(false);
+		add(p_graph_effect_var);
+		ComparisonTable t_graph_effect_cons = new ComparisonTable(NUM_CONSTRAINTS);
+		t_graph_effect_cons.setTitle("Impact of dependency graph on number of constraints");
+		t_graph_effect_cons.setNickname("tDepGraphConstraints");
+		add(t_graph_effect_cons);
+		Scatterplot p_graph_effect_cons = new Scatterplot(t_graph_effect_cons);
+		p_graph_effect_cons.setCaption(Axis.X, "Full tree").setCaption(Axis.Y, "Dependency graph");
+		p_graph_effect_cons.setLogscale(Axis.X).setLogscale(Axis.Y);
+		p_graph_effect_cons.setTitle(t_graph_effect_cons.getTitle());
+		p_graph_effect_cons.setNickname("pDepGraphConstraints");
+		p_graph_effect_cons.withLines(false);
+		add(p_graph_effect_cons);
 		for (int i = 0; i < m_numPages; i++)
 		{
 			PickerBoxProvider pbp = new PickerBoxProvider(seed + i, max_faults);
-			SolverExperiment e_complete = new SolverExperiment(pbp);
+			SolverExperiment e_complete = new SolverExperiment(pbp, solve_complete);
 			e_complete.setInput(TREE_TYPE, TREE_TYPE_COMPLETE);
 			add(e_complete);
-			SolverExperiment e_trimmed = new SolverExperiment(pbp);
+			SolverExperiment e_trimmed = new SolverExperiment(pbp, solve_reduced);
 			e_trimmed.setInput(TREE_TYPE, TREE_TYPE_TRIMMED);
 			add(e_trimmed, et_time, et_faults, et_constraints);
 			t_trim_effect.add(e_complete, e_trimmed);
+			SolverExperiment e_graph = new SolverExperiment(pbp, solve_reduced);
+			e_graph.setInput(TREE_TYPE, TREE_TYPE_DEPENDENCY);
+			add(e_graph, et_time, et_faults, et_constraints);
+			t_graph_effect_var.add(e_complete, e_graph);
+			t_graph_effect_cons.add(e_complete, e_graph);
 		}
 		
 		// Global macros
@@ -123,6 +169,8 @@ public class HotfixLaboratory extends Laboratory
 	public void setupCli(CliParser parser)
 	{
 		parser.addArgument(new Argument().withLongName("no-solve").withDescription("Disable solver"));
+		parser.addArgument(new Argument().withLongName("no-complete").withDescription("Disable solver for complete trees only"));
+		parser.addArgument(new Argument().withLongName("max-faults").withArgument("x").withDescription("Set maximum number of faults in a page to x"));
 	}
 	
 	/**

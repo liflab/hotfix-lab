@@ -18,7 +18,11 @@
  */
 package hotfixlab;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import ca.uqac.lif.pagen.Box;
+import ca.uqac.lif.pagen.BoxDependency;
 import ca.uqac.lif.pagen.HorizontalFlowLayout;
 import ca.uqac.lif.pagen.LayoutManager;
 import ca.uqac.lif.pagen.RandomBoxPicker;
@@ -154,5 +158,15 @@ public class PickerBoxProvider implements BoxProvider
 	public int getMisalignmentCount()
 	{
 		return m_horizontalFlowLayout1.getMisalignmentCount() + m_horizontalFlowLayout2.getMisalignmentCount() + m_verticalFlowLayout.getMisalignmentCount();
+	}
+
+	@Override
+	public Set<BoxDependency> getDependencies()
+	{
+		Set<BoxDependency> deps = new HashSet<BoxDependency>();
+		deps.addAll(m_horizontalFlowLayout1.getDependencies());
+		deps.addAll(m_horizontalFlowLayout2.getDependencies());
+		deps.addAll(m_verticalFlowLayout.getDependencies());
+		return deps;
 	}
 }
