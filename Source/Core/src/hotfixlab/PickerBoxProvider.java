@@ -77,6 +77,7 @@ public class PickerBoxProvider implements BoxProvider
 		int max_depth = 10; // 5
 		float p_degree = 2.2f; //2.2f;
 		float p_misalignment = 0.025f, p_overlap = 0.025f, p_overflow = 0.025f;
+		//float p_misalignment = 0.025f, p_overlap = 0f, p_overflow = 0f;
 
 		// Initialize RNGs and seed
 		RandomBooleanMax rmb = new RandomBooleanMax(m_maxFaults);

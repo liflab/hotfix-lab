@@ -28,8 +28,8 @@ import ca.uqac.lif.mtnp.plot.TwoDimensionalPlot.Axis;
 import ca.uqac.lif.mtnp.plot.gnuplot.Scatterplot;
 
 import static hotfixlab.SolverExperiment.INITIAL_SIZE;
-import static hotfixlab.SolverExperiment.NUM_CONSTRAINTS;
 import static hotfixlab.SolverExperiment.NUM_FAULTS;
+import static hotfixlab.SolverExperiment.NUM_MODEL_CONSTRAINTS;
 import static hotfixlab.SolverExperiment.NUM_VARIABLES;
 import static hotfixlab.SolverExperiment.SIZE;
 import static hotfixlab.SolverExperiment.TIME;
@@ -96,7 +96,7 @@ public class HotfixLaboratory extends Laboratory
 		p_faults.setTitle(et_faults.getTitle());
 		p_faults.setNickname("pTimeVsFaults");
 		add(p_faults);
-		ExperimentTable et_constraints = new ExperimentTable(NUM_CONSTRAINTS, TIME);
+		ExperimentTable et_constraints = new ExperimentTable(NUM_MODEL_CONSTRAINTS, TIME);
 		et_constraints.setTitle("Solving time with respect to number of constraints");
 		et_constraints.setNickname("etTimeVsConstraints");
 		add(et_constraints);
@@ -127,7 +127,7 @@ public class HotfixLaboratory extends Laboratory
 		p_graph_effect_var.setNickname("pDepGraphSize");
 		p_graph_effect_var.withLines(false);
 		add(p_graph_effect_var);
-		ComparisonTable t_graph_effect_cons = new ComparisonTable(NUM_CONSTRAINTS);
+		ComparisonTable t_graph_effect_cons = new ComparisonTable(NUM_MODEL_CONSTRAINTS);
 		t_graph_effect_cons.setTitle("Impact of dependency graph on number of constraints");
 		t_graph_effect_cons.setNickname("tDepGraphConstraints");
 		add(t_graph_effect_cons);
